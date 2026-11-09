@@ -157,9 +157,42 @@ const ENGINES = [
           'At 19 000 rpm it fires 1583 times per second.',
   },
   {
+    // Firing order not published. Modelled per enthusiast analysis of the crank: two cross-plane
+    // V8s end to end, the rear one offset 45°. Left bank = 1-8 (front 1-4, rear 5-8), right = 9-16.
+    id: 'v16-tourbillon', group: 'V engines', name: 'V16 90° cross-plane (Bugatti Tourbillon style)',
+    firingOrder: [1, 5, 12, 16, 10, 14, 2, 6, 11, 15, 3, 7, 4, 8, 9, 13], intervals: repeat([45], 16), banks: 2, bankOf: firstHalf(8),
+    note: 'Cosworth-built 8.3 L naturally aspirated 90° V16 with a cross-plane crank, 9000 rpm. ' +
+          'The firing order is not published: modelled as two cross-plane V8s end to end, offset 45° ' +
+          '(based on enthusiast analysis of crank photos). Fires every 45°, 1200 times a second at 9000 rpm, ' +
+          'with each bank getting an uneven cross-plane rhythm.',
+  },
+  {
     id: 'v12', group: 'V engines', name: 'V12 (60°)',
     firingOrder: [1, 7, 5, 11, 3, 9, 6, 12, 2, 8, 4, 10], intervals: repeat([60], 12), banks: 2, bankOf: firstHalf(6),
     note: 'Even 60° spacing, six pulses per revolution. Smooth, silky wail.',
+  },
+
+  // ---- W engines ----------------------------------------------------------
+  // VW's W layout: two narrow-angle (15°) "VR" banks side by side on one crank.
+  // Each VR bank has its own exhaust, so for sound a W engine has two banks like a V.
+  {
+    id: 'w8', group: 'W engines', name: 'W8 (VW Passat W8 style)',
+    firingOrder: [1, 5, 2, 6, 4, 8, 3, 7], intervals: repeat([90], 8), banks: 2, bankOf: firstHalf(4),
+    note: 'Two VR4 banks at 72°, flat (180°) crank. Fires every 90°; banks alternate, so each fires every 180° ' +
+          '(like a flat-plane V8, i.e. two inline-4s). No production car used a W6; the W8 is the smallest VW W engine.',
+  },
+  {
+    id: 'w12', group: 'W engines', name: 'W12 twin-turbo (VW / Bentley style)',
+    firingOrder: [1, 12, 5, 8, 3, 10, 6, 7, 2, 11, 4, 9], intervals: repeat([60], 12), banks: 2, bankOf: firstHalf(6),
+    note: 'Two VR6 banks at 72°. Fires every 60° like a V12, banks alternate, each bank every 120° ' +
+          '(like an inline-6). Smooth, deep and muted, with turbo whoosh (Continental GT).',
+  },
+  {
+    id: 'w16', group: 'W engines', name: 'W16 quad-turbo (Bugatti Veyron / Chiron style)',
+    firingOrder: [1, 14, 9, 4, 7, 12, 15, 6, 13, 8, 3, 16, 11, 2, 5, 10], intervals: repeat([45], 16), banks: 2, bankOf: firstHalf(8),
+    note: 'Two VR8 banks, 8.0 L, four turbos. Fires every 45°, but the banks do not simply alternate: ' +
+          'Bugatti calls it an "asymmetric firing order", so each bank gets an uneven rhythm. ' +
+          'Four turbos smother the pulses: a deep, smooth roar with huge turbo whoosh.',
   },
 ];
 
@@ -185,6 +218,7 @@ const ENGINES = [
 //   launchRpm    launch control RPM (null = automatic)
 //   gearRatios   gearbox used by Launch & drive
 //   uelLength    unequal-length headers (m): pulses from some cylinders arrive late -> boxer rumble
+//   itb          individual throttle bodies: each cylinder's own intake trumpet -> crisp induction bark
 // Selecting an engine loads its preset into the sliders.
 // ---------------------------------------------------------------------------
 
@@ -195,6 +229,7 @@ const DEFAULT_SOUND = {
   headerSpread: 0.08, bankSkew: 0.03, width: 0.35, roughness: 0.15,
   rasp: 0.25, intake: 0.2, turbo: 0, whine: 0.1, crackle: 0.4,
   uelLength: 0, // extra header length (m) for cylinders marked in an engine's uelPattern
+  itb: 0,       // individual throttle bodies (0 = common plenum)
 };
 
 const SOUND_PRESETS = {
@@ -214,7 +249,7 @@ const SOUND_PRESETS = {
                 bankSkew: 0.06, width: 0.15, rasp: 0.55, intake: 0.15, turbo: 0.55, whine: 0.3, crackle: 0.45 },
   'i6-2jz':   { redline: 7000, pipeLength: 1.9, resonance: 0.55, muffler: 1500, brighten: 0.7, headerSpread: 0.05,
                 bankSkew: 0.06, width: 0.15, rasp: 0.3, intake: 0.1, turbo: 0.75, whine: 0.2, crackle: 0.3 },
-  'i6-s54':   { redline: 8000, pipeLength: 1.6, resonance: 0.45, muffler: 2200, brighten: 1.0, headerSpread: 0.04,
+  'i6-s54':   { itb: 1, redline: 8000, pipeLength: 1.6, resonance: 0.45, muffler: 2200, brighten: 1.0, headerSpread: 0.04,
                 bankSkew: 0.05, width: 0.25, rasp: 0.45, intake: 0.6, crackle: 0.3 },
   // GT-R VR38DETT: twin turbo, titanium exhaust, famous transmission whine.
   'v6':       { redline: 7000, pipeLength: 1.6, resonance: 0.45, muffler: 1500, brighten: 0.7, width: 0.4,
@@ -227,19 +262,29 @@ const SOUND_PRESETS = {
   'v8-flat':  { bankSkew: 0, redline: 9000, pipeLength: 1.2, resonance: 0.45, muffler: 2200, brighten: 1.0, headerSpread: 0.04, width: 0.35,
                 rasp: 0.6, intake: 0.35, crackle: 0.4 },
   // LFA 1LR-GUE: equal-length headers, tuned intake "sound channel", F1 scream.
-  'v10-even': { bankSkew: 0, redline: 9000, pipeLength: 1.1, resonance: 0.4, muffler: 2400, brighten: 1.3, headerSpread: 0.03, width: 0.3,
+  'v10-even': { itb: 1, bankSkew: 0, redline: 9000, pipeLength: 1.1, resonance: 0.4, muffler: 2400, brighten: 1.3, headerSpread: 0.03, width: 0.3,
                 rasp: 0.5, intake: 0.7, crackle: 0.3 },
   // BMW S85 (E60 M5): same firing, longer road exhaust, darker but still a scream at the top.
-  'v10-s85':  { bankSkew: 0.01, redline: 8250, pipeLength: 1.7, resonance: 0.55, muffler: 1600, brighten: 1.1, headerSpread: 0.06, width: 0.4,
-                rasp: 0.35, intake: 0.35, crackle: 0.3 },
+  'v10-s85':  { itb: 1, bankSkew: 0.01, redline: 8250, pipeLength: 1.7, resonance: 0.55, muffler: 1600, brighten: 1.1, headerSpread: 0.06, width: 0.4,
+                rasp: 0.35, intake: 0.6, crackle: 0.3 },
   // Viper-style truck-derived V10: lumpy and deep.
   'v10-odd':  { redline: 6200, pipeLength: 2.0, resonance: 0.65, muffler: 1000, brighten: 0.4, headerSpread: 0.25, bankSkew: 0.08, width: 0.7, roughness: 0.2 },
   'flat4-ej': { redline: 7000, pipeLength: 1.6, resonance: 0.55, muffler: 1400, brighten: 0.6, headerSpread: 0.08,
                 rasp: 0.3, intake: 0.15, turbo: 0.6, whine: 0.2, crackle: 0.4, roughness: 0.2, uelLength: 0.45 },
   'flat6':    { bankSkew: 0, redline: 9000, inertia: 0.25, pipeLength: 1.2, resonance: 0.4, muffler: 2600, brighten: 1.2,
                 headerSpread: 0.03, width: 0.35, rasp: 0.5, intake: 0.55, crackle: 0.3 },
+  // Tourbillon V16: NA, cross-plane, revs to 9000; between a muscle V8 rumble and a V12 wail.
+  'v16-tourbillon': { redline: 9000, pipeLength: 1.5, resonance: 0.5, muffler: 2000, brighten: 1.1, headerSpread: 0.12,
+                      bankSkew: 0.04, width: 0.5, rasp: 0.4, intake: 0.4, crackle: 0.35, inertia: 0.3 },
+  'w8':       { bankSkew: 0.01, redline: 6500, pipeLength: 1.5, resonance: 0.5, muffler: 1500, brighten: 0.7, headerSpread: 0.06,
+                width: 0.35, rasp: 0.25, intake: 0.15 },
+  'w12':      { bankSkew: 0, redline: 6500, pipeLength: 1.8, resonance: 0.5, muffler: 1300, brighten: 0.6, headerSpread: 0.05,
+                width: 0.4, rasp: 0.2, intake: 0.1, turbo: 0.6, crackle: 0.3 },
+  // Four turbos: heavily damped pulses, lots of boost noise, short redline.
+  'w16':      { redline: 6700, pipeLength: 1.8, resonance: 0.55, muffler: 1100, brighten: 0.5, headerSpread: 0.08,
+                bankSkew: 0.04, width: 0.6, rasp: 0.2, intake: 0.15, turbo: 0.9, whine: 0.3, crackle: 0.35 },
   // 2000s F1: open short exhaust, huge intake howl, featherweight flywheel, 7 close gears.
-  'v10-f1':   { bankSkew: 0, redline: 19000, idleRpm: 4000, launchRpm: 11000, inertia: 0.08,
+  'v10-f1':   { itb: 1, bankSkew: 0, redline: 19000, idleRpm: 4000, launchRpm: 11000, inertia: 0.08,
                 gearRatios: [2.9, 2.4, 2.0, 1.7, 1.47, 1.29, 1.15],
                 pipeLength: 0.7, resonance: 0.3, muffler: 6000, brighten: 1.0, headerSpread: 0.02, width: 0.25,
                 rasp: 0.6, intake: 0.6, roughness: 0.08, crackle: 0.2, whine: 0.25 },

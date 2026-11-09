@@ -105,12 +105,18 @@ function createEngineDSPClass() {
     for (let k = 0; k <= TLEN; k++) blow[k] /= peak;
     const ivcPeak = Math.max(...ivc);
     for (let k = 0; k <= TLEN; k++) ivc[k] /= ivcPeak;
+    // Rate of change of intake flow: the suction wave when the intake valve opens
+    // (and the stop when it closes). With ITBs this is heard directly at the trumpet.
+    const intakeD = new Float32Array(TLEN + 1);
+    for (let k = 0; k <= TLEN; k++) intakeD[k] = intake[(k + 1) % TLEN] - intake[(k + TLEN - 1) % TLEN];
+    const idPeak = Math.max(...intakeD.map(Math.abs));
+    for (let k = 0; k <= TLEN; k++) intakeD[k] /= idPeak;
     // Block vibration is driven by the CHANGE of cylinder pressure (the "knock" of combustion).
     const mech = new Float32Array(TLEN + 1);
     for (let k = 0; k <= TLEN; k++) mech[k] = press[(k + 1) % TLEN] - press[(k + TLEN - 1) % TLEN];
     const mp = Math.max(...mech.map(Math.abs));
     for (let k = 0; k <= TLEN; k++) mech[k] /= mp;
-    return { blow, disp, intake, ivc, mech };
+    return { blow, disp, intake, intakeD, ivc, mech };
   }
 
   function lookup(table, th) {
@@ -198,7 +204,13 @@ function createEngineDSPClass() {
         turbo: 0,           // 0 = naturally aspirated, 1 = big turbos
         whine: 0.1,         // gearbox whine during Launch & drive
         uelLength: 0,       // unequal-length headers: extra pipe length (m) for marked cylinders
+        itb: 0,             // 0 = common intake plenum, 1 = individual throttle bodies
       };
+      // Individual throttle bodies: trumpet radiation, butterfly hiss, lift-off chuff.
+      this.itbPrev = 0;
+      this.itbLP = new OnePole().set(7000, sr);
+      this.itbHiss = new Biquad().bandpass(3200, 1.5, sr);
+      this.chuffEnv = 0; this.chuffLP = new OnePole().set(900, sr); this.loadPeak = 0;
       // Flow noise is not white: tint it to the band where gas turbulence lives.
       this.noiseF = [0, 1].map(() => ({ lp: new OnePole().set(3500, sr), hp: new Biquad().highpass(350, 0.7, sr) }));
       // Intake: plenum/airbox resonance + runner resonance.
@@ -336,6 +348,8 @@ function createEngineDSPClass() {
           angle: ev.angle, bank: bankCount > 1 ? ev.bank : 0, amp: 0.4, warp: 1, trim: 0.88 + 0.24 * hash(i + 3), runner,
           // Unequal-length headers: extra travel time to the collector (pure delay).
           uel: ev.uel || 0, travel: new Float32Array(512), tw: 0, td: 0,
+          // Own intake runner + trumpet, used when the engine has individual throttle bodies.
+          irunner: new PipeSection(Math.ceil(sr * 0.01)),
         };
       });
       this.configureRunners();
@@ -364,6 +378,9 @@ function createEngineDSPClass() {
         c.runner.set(0.5 * (1 + s * (2 * hash(i + 1) - 1)), -0.4, 3500 + 1000 * hash(i + 7), this.sr);
         // A longer pipe delays the pulse's arrival at the collector by extraLength / c.
         c.td = clamp(Math.round(((c.uel * this.params.uelLength) / C) * this.sr), 0, c.travel.length - 1);
+        // ITB runner + velocity stack ~0.32 m: open trumpet end reflects inverted,
+        // giving a ringing quarter-wave resonance (~270 Hz and odd multiples).
+        c.irunner.set(0.32 * (1 + 0.03 * (2 * hash(i + 11) - 1)), -0.75, 5000, this.sr);
       });
     }
 
@@ -419,6 +436,9 @@ function createEngineDSPClass() {
       const spoolUp = 1 - Math.exp(-1 / (0.6 * sr));   // turbo lag
       const spoolDown = 1 - Math.exp(-1 / (0.3 * sr));
       const bovDecay = Math.exp(-1 / (0.35 * sr));
+      const ITB_GAIN = 2.5;
+      const chuffDecay = Math.exp(-1 / (0.08 * sr));
+      const chuffPeakDecay = Math.exp(-1 / (0.4 * sr));
 
       for (let i = 0; i < L.length; i++) {
         // ---- RPM, rev limiter, load ----
@@ -463,7 +483,8 @@ function createEngineDSPClass() {
         const f0 = this.noiseF[0], f1 = this.noiseF[1];
         const cn0 = 2.5 * f0.hp.process(f0.lp.process(nz0));
         const cn1 = 2.5 * f1.hp.process(f1.lp.process(nz1));
-        let in0 = 0, in1 = 0, mech = 0, intakeFlow = 0, intakePulse = 0;
+        let in0 = 0, in1 = 0, mech = 0, intakeFlow = 0, intakePulse = 0, itbSum = 0;
+        const itbOn = p.itb > 0;
         for (let k = 0; k < cyls.length; k++) {
           const c = cyls[k];
           let th = this.crank - c.angle;
@@ -483,7 +504,10 @@ function createEngineDSPClass() {
           if (c.bank) in1 += y; else in0 += y;
           mech += c.amp * lookup(t.mech, th);
           intakeFlow += lookup(t.intake, th);
-          intakePulse += lookup(t.ivc, th);
+          const ivcPulse = lookup(t.ivc, th);
+          intakePulse += ivcPulse;
+          // ITB: this cylinder's suction wave + valve-closing pulse ring in its own runner.
+          if (itbOn) itbSum += c.trim * c.irunner.process(ivcPulse + 0.6 * lookup(t.intakeD, th));
         }
 
         // ---- exhaust banks ----
@@ -500,7 +524,26 @@ function createEngineDSPClass() {
         const iSrc = (intakePulse + 0.3 * intakeFlow) * breath;
         const howl = 1.2 * this.intakeRes[0].process(iSrc) + 0.9 * this.intakeRes[1].process(iSrc);
         const roar = this.intakeBP.process(intakeFlow * (Math.random() * 2 - 1)) * (0.1 + this.load + p.turbo * this.boost) * intakeNorm;
-        const intakeOut = p.intake * 3.2 * (howl + 0.2 * roar);
+        let intakeOut = p.intake * 3.2 * (howl + 0.2 * roar);
+
+        // ---- individual throttle bodies ----
+        if (itbOn) {
+          // Sound radiates from the open trumpet mouths: radiation ~ rate of change (crisp bark).
+          const bark = this.itbLP.process(itbSum - this.itbPrev);
+          this.itbPrev = itbSum;
+          // Part throttle: air hisses past the half-open butterflies.
+          const partThrottle = this.load * (1 - this.load) * 4;
+          const hiss = this.itbHiss.process(nz1) * intakeFlow * intakeNorm * partThrottle;
+          // Lift-off: the moving air column in the runners stops abruptly -> "chuff".
+          this.loadPeak = Math.max(this.load, this.loadPeak * chuffPeakDecay);
+          if (this.loadPeak - this.load > 0.45 && this.chuffEnv < 0.05) { this.chuffEnv = this.loadPeak; this.loadPeak = this.load; }
+          let chuff = 0;
+          if (this.chuffEnv > 1e-3) { chuff = this.chuffLP.process(nz0) * this.chuffEnv; this.chuffEnv *= chuffDecay; }
+          // Radiation rises with frequency, so tame it as RPM climbs or it drowns the exhaust.
+          const rpmComp = Math.min(1.4, Math.sqrt(4000 / Math.max(this.rpm, 500)));
+          const itbOut = breath * ITB_GAIN * rpmComp * bark + 0.12 * hiss + 0.5 * chuff;
+          intakeOut = intakeOut * (1 - p.itb) + p.intake * 3.2 * p.itb * itbOut;
+        }
 
         // ---- turbo whistle + blow-off valve ----
         let turboOut = 0;

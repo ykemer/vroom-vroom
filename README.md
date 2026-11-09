@@ -47,6 +47,9 @@ Touching the RPM slider or revving cancels the sequence. Use headphones for V en
    A source shaped in crank degrees fed through resonances fixed in time is what makes it sound like an engine.
 5. **Intake:** when an intake valve slams shut, it sends a pulse ringing through the plenum and runner
    resonances. This is the induction howl that dominates the LFA sound.
+   With **individual throttle bodies** (S85, S54, LFA, F1), each cylinder instead has its own runner
+   and trumpet. Its pulses ring there and radiate straight out, giving a crisp induction bark, plus
+   part-throttle hiss past the butterflies and a "chuff" on lift-off.
 6. **Rasp:** the upper band of the exhaust saturates, giving the metallic edge of Ferrari and LFA exhausts.
 7. **Turbo (GT-R):**
    - The turbines soften the exhaust pulses.
@@ -65,7 +68,8 @@ Touching the RPM slider or revving cancels the sequence. Use headphones for V en
 
 Single, parallel twin (360°/180°/270°), V-twin 45°, I3, I4, I5, I6 (generic, RB26, 2JZ, S54 styles),
 flat-4 (Subaru, with unequal-length header rumble), flat-6 (911 GT3), V6 60° even (GT-R), V6 90° odd-fire,
-V8 cross-plane, V8 flat-plane, V10 even (72°), V10 odd (90°/54°), V12.
+V8 cross-plane, V8 flat-plane, V10 even (72°), V10 odd (90°/54°), F1 V10, V12,
+V16 (Bugatti Tourbillon style; firing order not published, so it is modelled), W8, W12, W16 (Bugatti).
 
 Add an engine by appending one entry to `ENGINES` in `engines.js`.
 

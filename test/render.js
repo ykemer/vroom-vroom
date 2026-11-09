@@ -118,7 +118,7 @@ for (const id of ['v8-cross', 'v8-flat', 'i4', 'v10-even']) {
 
 // --- 4. Launch & drive sequence ---
 console.log('\nLaunch & drive:');
-for (const id of ['v8-cross', 'v8-flat', 'v6', 'v10-even', 'v10-s85', 'v10-f1', 'v12', 'i6-rb26', 'i6-2jz', 'i6-s54', 'flat4-ej', 'flat6']) {
+for (const id of ['v8-cross', 'v8-flat', 'v6', 'v10-even', 'v10-s85', 'v10-f1', 'v12', 'i6-rb26', 'i6-2jz', 'i6-s54', 'flat4-ej', 'flat6', 'w12', 'w16', 'v16-tourbillon']) {
   const engine = ENGINES.find((e) => e.id === id);
   const redline = soundFor(engine).redline;
   const d = makeEngine(engine, 900);
