@@ -3,7 +3,9 @@
 A browser simulator of engine exhaust sound. Every combustion produces one pressure pulse,
 fired at the exact crank angle the engine's firing order dictates.
 
-## Run
+**▶ Live demo: https://ykemer.github.io/vroom-vroom/** (click *Start engine*; headphones recommended)
+
+## Run locally
 
 Open `index.html` in Chrome, Edge or Firefox and click **Start engine**. No build and no server needed.
 (If your browser blocks it from `file://`, run `npm run serve` and open http://localhost:8080.)
