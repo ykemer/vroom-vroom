@@ -17,7 +17,7 @@
       <div class="row">
         <button id="startBtn" class="primary">▶ Start engine</button>
         <button id="revBtn" disabled title="Or hold the Space key. Hits the rev limiter at redline; release for overrun crackle.">Hold to rev (Space)</button>
-        <button id="sweepBtn" disabled>Sweep 800 → redline</button>
+        <button id="sweepBtn" disabled>Sweep → redline</button>
         <button id="driveBtn" disabled title="Launch control, 4 upshifts at redline, hard braking with rev-matched downshifts, back to idle">🏁 Launch &amp; drive</button>
       </div>
 
@@ -29,14 +29,14 @@
       <label class="field">
         <span>RPM</span>
         <div class="rpm">
-          <input id="rpmSlider" type="range" min="800" max="18000" step="10" value="1200">
-          <input id="rpmInput" type="number" min="800" max="18000" step="10" value="1200">
+          <input id="rpmSlider" type="range" min="800" max="20000" step="10" value="1200">
+          <input id="rpmInput" type="number" min="800" max="20000" step="10" value="1200">
         </div>
       </label>
 
       <label class="field">
         <span>Redline (rev / sweep target)</span>
-        <input id="redline" type="number" min="1000" max="18000" step="100" value="7500">
+        <input id="redline" type="number" min="1000" max="20000" step="100" value="7500">
       </label>
 
       <p class="hint">Exhaust sliders load a preset for each engine (e.g. cross-plane V8 = AMG-style, V10 = LFA-style).
@@ -49,6 +49,7 @@
         <label>Muffler cutoff (Hz) <output></output><input data-param="muffler" type="range" min="300" max="8000" step="10" value="1800"></label>
         <label>Exhaust valve brightening at RPM <output></output><input data-param="brighten" type="range" min="0" max="1.5" step="0.01" value="0.8"></label>
         <label>Header length spread (rumble) <output></output><input data-param="headerSpread" type="range" min="0" max="0.5" step="0.01" value="0.08"></label>
+        <label>Unequal header length, m (boxer rumble) <output></output><input data-param="uelLength" type="range" min="0" max="0.6" step="0.01" value="0"></label>
         <label>Bank pipe asymmetry <output></output><input data-param="bankSkew" type="range" min="0" max="0.2" step="0.005" value="0.03"></label>
         <label>Rasp (metallic edge) <output></output><input data-param="rasp" type="range" min="0" max="1" step="0.01" value="0.25"></label>
         <label>Induction howl (intake) <output></output><input data-param="intake" type="range" min="0" max="1" step="0.01" value="0.2"></label>

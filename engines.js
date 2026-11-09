@@ -63,8 +63,45 @@ const ENGINES = [
   },
   {
     id: 'i6', group: 'Inline', name: 'Inline 6',
-    firingOrder: [1, 5, 3, 6, 2, 4], intervals: repeat([120], 6), banks: 1, bankOf: single,
-    note: 'Even 120° spacing, perfectly balanced, smooth.',
+    firingOrder: [1, 5, 3, 6, 2, 4], intervals: repeat([120], 6), banks: 2, bankOf: firstHalf(3),
+    note: 'Even 120° spacing, perfectly balanced. Performance I6 exhausts collect the front three (1-2-3) ' +
+          'and rear three (4-5-6) cylinders separately; with firing order 1-5-3-6-2-4 the groups alternate, ' +
+          'so each fires every 240°, like two inline-3s merging. That gives the hollow, raspy I6 sound.',
+  },
+  {
+    id: 'i6-rb26', group: 'Inline', name: 'Inline 6 twin-turbo (Nissan RB26DETT style)',
+    firingOrder: [1, 5, 3, 6, 2, 4], intervals: repeat([120], 6), banks: 2, bankOf: firstHalf(3),
+    note: 'Front three cylinders drive one turbo, rear three the other. High-revving, raspy, ' +
+          'with turbo whistle and blow-off on every shift (Skyline GT-R).',
+  },
+  {
+    id: 'i6-2jz', group: 'Inline', name: 'Inline 6 turbo (Toyota 2JZ-GTE style)',
+    firingOrder: [1, 5, 3, 6, 2, 4], intervals: repeat([120], 6), banks: 2, bankOf: firstHalf(3),
+    note: 'Big, under-stressed iron-block turbo six (Supra). Deeper and smoother than the RB26, ' +
+          'with a longer exhaust and lots of boost noise.',
+  },
+  {
+    id: 'i6-s54', group: 'Inline', name: 'Inline 6 NA (BMW S54 / M3 style)',
+    firingOrder: [1, 5, 3, 6, 2, 4], intervals: repeat([120], 6), banks: 2, bankOf: firstHalf(3),
+    note: 'Naturally aspirated, 8000 rpm, individual throttle bodies: a lot of the sound is intake howl. ' +
+          'Headers collect front three and rear three cylinders before merging.',
+  },
+
+  // ---- Boxer (flat) ---------------------------------------------------------
+  {
+    id: 'flat4-ej', group: 'Boxer (flat)', name: 'Flat 4 turbo (Subaru EJ / WRX STI style)',
+    firingOrder: [1, 3, 2, 4], intervals: repeat([180], 4), banks: 1, bankOf: single,
+    // Unequal-length headers: cylinders 2 and 4 have the longer pipes (factor 1 = full extra length).
+    uelPattern: { 1: 0, 2: 1, 3: 0, 4: 1 },
+    note: 'Fires evenly every 180°. The boxer rumble comes from unequal-length headers: pulses from ' +
+          'cylinders 2 and 4 travel further, so they reach the collector late and the even beat turns lopey. ' +
+          'Set "Unequal header length" to 0 for the smooth equal-length sound of later Subarus.',
+  },
+  {
+    id: 'flat6', group: 'Boxer (flat)', name: 'Flat 6 NA (Porsche 911 GT3 style)',
+    firingOrder: [1, 6, 2, 4, 3, 5], intervals: repeat([120], 6), banks: 2, bankOf: firstHalf(3),
+    note: 'Even 120°. Banks (1-3 and 4-6) alternate, so each bank fires every 240°, like two inline-3s. ' +
+          'High-revving, intake-heavy, raspy howl.',
   },
 
   // ---- V engines ----------------------------------------------------------
@@ -112,6 +149,14 @@ const ENGINES = [
     note: '90° V10 with shared crank pins: firings alternate 90° and 54° apart. Truck-like, uneven growl.',
   },
   {
+    id: 'v10-f1', group: 'V engines', name: 'V10 F1 (2000s, 72° even-fire, 19 000 rpm)',
+    firingOrder: [1, 6, 5, 10, 2, 7, 3, 8, 4, 9], intervals: repeat([72], 10), banks: 2, bankOf: firstHalf(5),
+    note: 'Representative mid-2000s 3.0 L Formula 1 V10. Firing every 72° (a 72° V angle with shared ' +
+          'crank pins fires evenly); V angle and crank details varied between manufacturers. ' +
+          'Tiny flywheel, ~4000 rpm idle, very short open exhaust, airbox intake above the driver, 7 close gears. ' +
+          'At 19 000 rpm it fires 1583 times per second.',
+  },
+  {
     id: 'v12', group: 'V engines', name: 'V12 (60°)',
     firingOrder: [1, 7, 5, 11, 3, 9, 6, 12, 2, 8, 4, 10], intervals: repeat([60], 12), banks: 2, bankOf: firstHalf(6),
     note: 'Even 60° spacing, six pulses per revolution. Smooth, silky wail.',
@@ -135,14 +180,21 @@ const ENGINES = [
 //   intake       induction howl level       -> LFA / Ferrari intake scream
 //   turbo        0 = NA, 1 = big turbos     -> softer pulses, whistle, blow-off
 //   whine        gearbox whine in Launch & drive
+//   inertia      flywheel: how fast RPM follows the throttle
+//   idleRpm      idle speed (also where Launch & drive ends)
+//   launchRpm    launch control RPM (null = automatic)
+//   gearRatios   gearbox used by Launch & drive
+//   uelLength    unequal-length headers (m): pulses from some cylinders arrive late -> boxer rumble
 // Selecting an engine loads its preset into the sliders.
 // ---------------------------------------------------------------------------
 
 const DEFAULT_SOUND = {
-  redline: 7500,
+  redline: 7500, inertia: 0.35, idleRpm: 900, launchRpm: null,
+  gearRatios: [3.5, 2.2, 1.6, 1.25],
   pipeLength: 1.4, resonance: 0.5, muffler: 1800, brighten: 0.8,
   headerSpread: 0.08, bankSkew: 0.03, width: 0.35, roughness: 0.15,
   rasp: 0.25, intake: 0.2, turbo: 0, whine: 0.1, crackle: 0.4,
+  uelLength: 0, // extra header length (m) for cylinders marked in an engine's uelPattern
 };
 
 const SOUND_PRESETS = {
@@ -154,7 +206,16 @@ const SOUND_PRESETS = {
   'i3':       { redline: 7000, pipeLength: 1.3, resonance: 0.5, muffler: 1700, brighten: 0.8 },
   'i4':       { redline: 8000, pipeLength: 1.2, resonance: 0.45, muffler: 2000, brighten: 1.0 },
   'i5':       { redline: 7000, pipeLength: 1.5, resonance: 0.55, muffler: 1600, brighten: 0.8, headerSpread: 0.12 },
-  'i6':       { redline: 7500, pipeLength: 1.5, resonance: 0.45, muffler: 2000, brighten: 0.9, headerSpread: 0.05 },
+  // Inline 6s: two exhaust groups (1-2-3 / 4-5-6) merging into one pipe -> low width,
+  // some group asymmetry so the 240° per-group rhythm comes through.
+  'i6':       { redline: 7500, pipeLength: 1.5, resonance: 0.45, muffler: 2000, brighten: 0.9, headerSpread: 0.05,
+                bankSkew: 0.05, width: 0.2, rasp: 0.35, intake: 0.25 },
+  'i6-rb26':  { redline: 8000, pipeLength: 1.3, resonance: 0.4, muffler: 2600, brighten: 1.0, headerSpread: 0.06,
+                bankSkew: 0.06, width: 0.15, rasp: 0.55, intake: 0.15, turbo: 0.55, whine: 0.3, crackle: 0.45 },
+  'i6-2jz':   { redline: 7000, pipeLength: 1.9, resonance: 0.55, muffler: 1500, brighten: 0.7, headerSpread: 0.05,
+                bankSkew: 0.06, width: 0.15, rasp: 0.3, intake: 0.1, turbo: 0.75, whine: 0.2, crackle: 0.3 },
+  'i6-s54':   { redline: 8000, pipeLength: 1.6, resonance: 0.45, muffler: 2200, brighten: 1.0, headerSpread: 0.04,
+                bankSkew: 0.05, width: 0.25, rasp: 0.45, intake: 0.6, crackle: 0.3 },
   // GT-R VR38DETT: twin turbo, titanium exhaust, famous transmission whine.
   'v6':       { redline: 7000, pipeLength: 1.6, resonance: 0.45, muffler: 1500, brighten: 0.7, width: 0.4,
                 rasp: 0.2, intake: 0.1, turbo: 0.8, whine: 0.7, crackle: 0.25 },
@@ -173,6 +234,15 @@ const SOUND_PRESETS = {
                 rasp: 0.35, intake: 0.35, crackle: 0.3 },
   // Viper-style truck-derived V10: lumpy and deep.
   'v10-odd':  { redline: 6200, pipeLength: 2.0, resonance: 0.65, muffler: 1000, brighten: 0.4, headerSpread: 0.25, bankSkew: 0.08, width: 0.7, roughness: 0.2 },
+  'flat4-ej': { redline: 7000, pipeLength: 1.6, resonance: 0.55, muffler: 1400, brighten: 0.6, headerSpread: 0.08,
+                rasp: 0.3, intake: 0.15, turbo: 0.6, whine: 0.2, crackle: 0.4, roughness: 0.2, uelLength: 0.45 },
+  'flat6':    { bankSkew: 0, redline: 9000, inertia: 0.25, pipeLength: 1.2, resonance: 0.4, muffler: 2600, brighten: 1.2,
+                headerSpread: 0.03, width: 0.35, rasp: 0.5, intake: 0.55, crackle: 0.3 },
+  // 2000s F1: open short exhaust, huge intake howl, featherweight flywheel, 7 close gears.
+  'v10-f1':   { bankSkew: 0, redline: 19000, idleRpm: 4000, launchRpm: 11000, inertia: 0.08,
+                gearRatios: [2.9, 2.4, 2.0, 1.7, 1.47, 1.29, 1.15],
+                pipeLength: 0.7, resonance: 0.3, muffler: 6000, brighten: 1.0, headerSpread: 0.02, width: 0.25,
+                rasp: 0.6, intake: 0.6, roughness: 0.08, crackle: 0.2, whine: 0.25 },
   'v12':      { bankSkew: 0, redline: 9000, pipeLength: 1.2, resonance: 0.4, muffler: 2400, brighten: 1.1, headerSpread: 0.04, width: 0.3,
                 rasp: 0.4, intake: 0.4 },
 };
@@ -188,7 +258,10 @@ function soundFor(engine) {
 function buildEvents(engine) {
   let angle = 0;
   return engine.firingOrder.map((cyl, i) => {
-    const ev = { cyl, angle, bank: engine.banks > 1 ? engine.bankOf(cyl) : 0, gap: engine.intervals[i] };
+    const ev = {
+      cyl, angle, bank: engine.banks > 1 ? engine.bankOf(cyl) : 0, gap: engine.intervals[i],
+      uel: engine.uelPattern ? engine.uelPattern[cyl] || 0 : 0, // unequal-length header factor
+    };
     angle += engine.intervals[i];
     return ev;
   });

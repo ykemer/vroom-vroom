@@ -10,7 +10,7 @@ fired at the exact crank angle the engine's firing order dictates.
 Open `index.html` in Chrome, Edge or Firefox and click **Start engine**. No build and no server needed.
 (If your browser blocks it from `file://`, run `npm run serve` and open http://localhost:8080.)
 
-Controls: pick an engine, set RPM (800–18 000), hold **Space** or *Hold to rev* to rev to the
+Controls: pick an engine, set RPM (800–20 000), hold **Space** or *Hold to rev* to rev to the
 redline, or *Sweep* to ramp up.
 
 **🏁 Launch & drive** runs a full sequence inside the DSP (`startDrive` / `stepDrive` in `dsp.js`):
@@ -33,7 +33,7 @@ Touching the RPM slider or revving cancels the sequence. Use headphones for V en
 | `test/render.js` | Runs the DSP in Node: checks firing angles and levels, writes WAV samples to `test/out/` |
 
 1. **Crank:** each audio sample the crank advances `rpm × 6 / sampleRate` degrees. When it crosses
-   a cylinder's firing angle, a pulse starts. Sub-sample timing keeps it exact even at 18 000 rpm.
+   a cylinder's firing angle, a pulse starts. Sub-sample timing keeps it exact even at 19 000 rpm (F1).
 2. **Source, shaped in crank degrees:** each cylinder's gas flow is read from tables indexed by
    its own crank angle. The exhaust valve opens at 135° after firing, giving a blowdown pulse
    (steep rise, ~30° decay). Then the piston pushes the rest of the gas out (180°–360°).
@@ -63,7 +63,8 @@ Touching the RPM slider or revving cancels the sequence. Use headphones for V en
 
 ## Engines
 
-Single, parallel twin (360°/180°/270°), V-twin 45°, I3, I4, I5, I6, V6 60° even, V6 90° odd-fire,
+Single, parallel twin (360°/180°/270°), V-twin 45°, I3, I4, I5, I6 (generic, RB26, 2JZ, S54 styles),
+flat-4 (Subaru, with unequal-length header rumble), flat-6 (911 GT3), V6 60° even (GT-R), V6 90° odd-fire,
 V8 cross-plane, V8 flat-plane, V10 even (72°), V10 odd (90°/54°), V12.
 
 Add an engine by appending one entry to `ENGINES` in `engines.js`.

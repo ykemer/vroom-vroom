@@ -197,6 +197,7 @@ function createEngineDSPClass() {
         intake: 0.2,        // induction howl level
         turbo: 0,           // 0 = naturally aspirated, 1 = big turbos
         whine: 0.1,         // gearbox whine during Launch & drive
+        uelLength: 0,       // unequal-length headers: extra pipe length (m) for marked cylinders
       };
       // Flow noise is not white: tint it to the band where gas turbulence lives.
       this.noiseF = [0, 1].map(() => ({ lp: new OnePole().set(3500, sr), hp: new Biquad().highpass(350, 0.7, sr) }));
@@ -229,7 +230,7 @@ function createEngineDSPClass() {
       if (m.type === 'engine') this.setEngine(m.events, m.bankCount);
       else if (m.type === 'rpm') { this.drive = null; this.target = clamp(m.rpm, 300, 20000); this.limiter = !!m.limiter; }
       else if (m.type === 'params') { Object.assign(this.params, m.params); this.applyParams(); }
-      else if (m.type === 'drive') this.startDrive(m.redline, m.idle);
+      else if (m.type === 'drive') this.startDrive(m.redline, m.idle, m.launchRpm, m.gearRatios);
       else if (m.type === 'driveStop') { this.drive = null; this.cut = false; }
     }
 
@@ -251,13 +252,13 @@ function createEngineDSPClass() {
     // engine force, a lower gear accelerates the car harder AND turns the engine
     // faster per km/h.
 
-    startDrive(redline, idle) {
-      const R = clamp(redline, 2000, 19000);
+    startDrive(redline, idle, launchRpm, gearRatios) {
+      const R = clamp(redline, 2000, 20000);
+      const ratios = gearRatios && gearRatios.length >= 2 ? gearRatios : [3.5, 2.2, 1.6, 1.25];
       this.drive = {
-        phase: 'launch', t: 0, gear: 1, gears: 4,
-        ratios: [3.5, 2.2, 1.6, 1.25, 1.0],
-        redline: R, idle: clamp(idle || 900, 600, 2000),
-        launchRpm: clamp(0.4 * R, 2800, 4500),
+        phase: 'launch', t: 0, gear: 1, gears: ratios.length, ratios,
+        redline: R, idle: clamp(idle || 900, 600, 6000),
+        launchRpm: launchRpm ? clamp(launchRpm, 1500, R * 0.8) : clamp(0.4 * R, 2800, 4500),
         shiftTarget: 0,
       };
       this.limiter = false;
@@ -304,7 +305,8 @@ function createEngineDSPClass() {
         case 'brake': {
           this.cut = false;
           this.rpm -= 0.6 * R * (ratio[g] / ratio[0]) * dt;
-          if (d.gear > 1 && this.rpm <= R * 0.55) {
+          // Downshift as soon as the lower gear would land at ~88% of redline (aggressive, high revs).
+          if (d.gear > 1 && this.rpm <= R * 0.88 * (ratio[g] / ratio[g - 1])) {
             d.shiftTarget = this.rpm * (ratio[g - 1] / ratio[g]);
             toPhase('downshift');
           } else if (d.gear === 1 && this.rpm <= Math.max(R * 0.35, d.idle + 800)) toPhase('idle');
@@ -330,7 +332,11 @@ function createEngineDSPClass() {
       this.cyls = events.map((ev, i) => {
         // Every cylinder is a little different: header length, combustion strength.
         const runner = new PipeSection(Math.ceil(sr * 0.012));
-        return { angle: ev.angle, bank: bankCount > 1 ? ev.bank : 0, amp: 0.4, warp: 1, trim: 0.88 + 0.24 * hash(i + 3), runner };
+        return {
+          angle: ev.angle, bank: bankCount > 1 ? ev.bank : 0, amp: 0.4, warp: 1, trim: 0.88 + 0.24 * hash(i + 3), runner,
+          // Unequal-length headers: extra travel time to the collector (pure delay).
+          uel: ev.uel || 0, travel: new Float32Array(512), tw: 0, td: 0,
+        };
       });
       this.configureRunners();
       // Resync the event pointer to the current crank position.
@@ -356,6 +362,8 @@ function createEngineDSPClass() {
       const s = this.params.headerSpread;
       this.cyls.forEach((c, i) => {
         c.runner.set(0.5 * (1 + s * (2 * hash(i + 1) - 1)), -0.4, 3500 + 1000 * hash(i + 7), this.sr);
+        // A longer pipe delays the pulse's arrival at the collector by extraLength / c.
+        c.td = clamp(Math.round(((c.uel * this.params.uelLength) / C) * this.sr), 0, c.travel.length - 1);
       });
     }
 
@@ -465,7 +473,13 @@ function createEngineDSPClass() {
           if (th > EVO) { tb = EVO + (th - EVO) * c.warp; if (tb > 719.9) tb = 719.9; }
           const flow = c.amp * lookup(t.blow, tb) + 0.22 * lookup(t.disp, th);
           const x = flow * (1 + noiseAmt * (c.bank ? cn1 : cn0));
-          const y = c.runner.process(x);
+          let y = c.runner.process(x);
+          if (c.td > 0) { // unequal-length header: pulse arrives late at the collector
+            const tl = c.travel.length;
+            c.travel[c.tw] = y;
+            y = c.travel[(c.tw - c.td + tl) % tl];
+            c.tw = (c.tw + 1) % tl;
+          }
           if (c.bank) in1 += y; else in0 += y;
           mech += c.amp * lookup(t.mech, th);
           intakeFlow += lookup(t.intake, th);

@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 
 const $ = (id) => document.getElementById(id);
-const MIN_RPM = 800, MAX_RPM = 18000;
+const MIN_RPM = 800, MAX_RPM = 20000;
 const BANK_COLORS = ['#ff8a3d', '#3db8ff'];
 const BANK_NAMES = ['A', 'B'];
 
@@ -52,6 +52,8 @@ function selectEngine(id) {
 function applySoundPreset() {
   const preset = soundFor(engine);
   $('redline').value = preset.redline;
+  // An F1 engine can't idle at 1200 rpm: never sit below the engine's idle speed.
+  if (setRpm < preset.idleRpm) setUserRpm(preset.idleRpm);
   for (const [key, value] of Object.entries(preset)) {
     const el = document.querySelector(`[data-param="${key}"]`);
     if (!el) continue;
@@ -190,7 +192,6 @@ async function startAudio() {
 
 // ---- Launch & drive --------------------------------------------------------
 
-const IDLE_RPM = 900;
 let wasDriving = false;
 
 function setupDrive() {
@@ -198,7 +199,8 @@ function setupDrive() {
     if (dspStatus?.drive) { send({ type: 'driveStop' }); sendTargetRpm(); return; }
     stopSweep();
     // The DSP runs the whole sequence itself (sample-accurate shifts).
-    send({ type: 'drive', redline: redline(), idle: IDLE_RPM });
+    const preset = soundFor(engine);
+    send({ type: 'drive', redline: redline(), idle: preset.idleRpm, launchRpm: preset.launchRpm, gearRatios: preset.gearRatios });
     dspStatus = { ...(dspStatus || {}), drive: { phase: 'launch', gear: 1 } }; // until the DSP reports
   });
 }
@@ -207,7 +209,7 @@ function updateDriveUi() {
   const driving = !!dspStatus?.drive;
   $('driveBtn').classList.toggle('active', driving);
   $('driveBtn').textContent = driving ? '■ Stop drive' : '🏁 Launch & drive';
-  if (wasDriving && !driving) setUserRpm(IDLE_RPM); // sequence ended: sync the RPM slider
+  if (wasDriving && !driving) setUserRpm(soundFor(engine).idleRpm); // sequence ended: sync the RPM slider
   wasDriving = driving;
 }
 

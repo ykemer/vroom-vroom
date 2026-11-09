@@ -1,7 +1,7 @@
 // test/render.js
 // Runs the real DSP in Node (no browser) to verify:
 //   1. combustion events fire at exactly the configured crank angles, in order
-//   2. output is finite, not silent and not clipping hard, from idle to 18 000 rpm
+//   2. output is finite, not silent and not clipping hard, from idle to 20 000 rpm
 // and writes WAV files to test/out/ so you can listen without a browser.
 //
 // Usage: node test/render.js
@@ -81,7 +81,7 @@ for (const engine of ENGINES) {
   }
 
   // --- 2. Levels across the RPM range ---
-  const levels = [800, 3000, 8000, 18000].map((r) => ({ rpm: r, ...stats(render(makeEngine(engine, r), 0.5)) }));
+  const levels = [800, 3000, 8000, 20000].map((r) => ({ rpm: r, ...stats(render(makeEngine(engine, r), 0.5)) }));
 
   console.log(`${engine.id.padEnd(9)} err=${maxErr.toFixed(4)}° order=${orderOk ? 'ok' : 'BAD'}  ` +
     levels.map((l) => `${l.rpm}:${l.rms.toFixed(3)}/${l.peak.toFixed(2)}`).join('  ') + '   (rms/peak)');
@@ -118,14 +118,15 @@ for (const id of ['v8-cross', 'v8-flat', 'i4', 'v10-even']) {
 
 // --- 4. Launch & drive sequence ---
 console.log('\nLaunch & drive:');
-for (const id of ['v8-cross', 'v8-flat', 'v6', 'v10-even', 'v10-s85', 'v12', 'i4']) {
+for (const id of ['v8-cross', 'v8-flat', 'v6', 'v10-even', 'v10-s85', 'v10-f1', 'v12', 'i6-rb26', 'i6-2jz', 'i6-s54', 'flat4-ej', 'flat6']) {
   const engine = ENGINES.find((e) => e.id === id);
   const redline = soundFor(engine).redline;
   const d = makeEngine(engine, 900);
-  d.handle({ type: 'drive', redline, idle: 900 });
+  const sp = soundFor(engine);
+  d.handle({ type: 'drive', redline, idle: sp.idleRpm, launchRpm: sp.launchRpm, gearRatios: sp.gearRatios });
   const log = [];
   let last = '', maxRpm = 0, done = -1;
-  const out = render(d, 30, (t, dsp) => {
+  const out = render(d, 40, (t, dsp) => {
     const s = dsp.status();
     maxRpm = Math.max(maxRpm, s.rpm);
     const key = s.drive ? `${s.drive.phase}${s.drive.gear}` : 'done';
@@ -140,7 +141,7 @@ for (const id of ['v8-cross', 'v8-flat', 'v6', 'v10-even', 'v10-s85', 'v12', 'i4
   console.log('    ' + log.join(' → '));
   if (done < 0) fail(`${id}: drive sequence never finished`);
   if (maxRpm > redline * 1.02) fail(`${id}: over-revved to ${maxRpm}`);
-  if (Math.abs(d.rpm - 900) > 60) fail(`${id}: did not return to idle (${d.rpm})`);
+  if (Math.abs(d.rpm - sp.idleRpm) > 60) fail(`${id}: did not return to idle (${d.rpm})`);
   if (!st.finite) fail(`${id}: non-finite output during drive`);
   writeWav(path.join(outDir, `${id}_launch_drive.wav`), { L: out.L.subarray(0, Math.round((done + 1.5) * SR)), R: out.R.subarray(0, Math.round((done + 1.5) * SR)) });
 }
