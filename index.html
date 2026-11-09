@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Exhaust Synth</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Exhaust Synth</h1>
+    <p>Simulates each combustion pulse at the exact crank angle of each engine's firing order.</p>
+  </header>
+
+  <main>
+    <section class="panel controls">
+      <div class="row">
+        <button id="startBtn" class="primary">▶ Start engine</button>
+        <button id="revBtn" disabled title="Or hold the Space key. Hits the rev limiter at redline; release for overrun crackle.">Hold to rev (Space)</button>
+        <button id="sweepBtn" disabled>Sweep 800 → redline</button>
+        <button id="driveBtn" disabled title="Launch control, 4 upshifts at redline, hard braking with rev-matched downshifts, back to idle">🏁 Launch &amp; drive</button>
+      </div>
+
+      <label class="field">
+        <span>Engine</span>
+        <select id="engineSelect"></select>
+      </label>
+
+      <label class="field">
+        <span>RPM</span>
+        <div class="rpm">
+          <input id="rpmSlider" type="range" min="800" max="18000" step="10" value="1200">
+          <input id="rpmInput" type="number" min="800" max="18000" step="10" value="1200">
+        </div>
+      </label>
+
+      <label class="field">
+        <span>Redline (rev / sweep target)</span>
+        <input id="redline" type="number" min="1000" max="18000" step="100" value="7500">
+      </label>
+
+      <p class="hint">Exhaust sliders load a preset for each engine (e.g. cross-plane V8 = AMG-style, V10 = LFA-style).
+        <button id="resetPresetBtn" type="button">Reset to engine preset</button></p>
+      <div class="sliders">
+        <label>Base throttle / load <output></output><input data-param="throttle" type="range" min="0" max="1" step="0.01" value="0.3"></label>
+        <label>Flywheel inertia (s) <output></output><input data-param="inertia" type="range" min="0.05" max="1.5" step="0.01" value="0.35"></label>
+        <label>Pipe length (m) <output></output><input data-param="pipeLength" type="range" min="0.4" max="4" step="0.05" value="1.4"></label>
+        <label>Pipe resonance / drone <output></output><input data-param="resonance" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+        <label>Muffler cutoff (Hz) <output></output><input data-param="muffler" type="range" min="300" max="8000" step="10" value="1800"></label>
+        <label>Exhaust valve brightening at RPM <output></output><input data-param="brighten" type="range" min="0" max="1.5" step="0.01" value="0.8"></label>
+        <label>Header length spread (rumble) <output></output><input data-param="headerSpread" type="range" min="0" max="0.5" step="0.01" value="0.08"></label>
+        <label>Bank pipe asymmetry <output></output><input data-param="bankSkew" type="range" min="0" max="0.2" step="0.005" value="0.03"></label>
+        <label>Rasp (metallic edge) <output></output><input data-param="rasp" type="range" min="0" max="1" step="0.01" value="0.25"></label>
+        <label>Induction howl (intake) <output></output><input data-param="intake" type="range" min="0" max="1" step="0.01" value="0.2"></label>
+        <label>Turbo (0 = naturally aspirated) <output></output><input data-param="turbo" type="range" min="0" max="1" step="0.01" value="0"></label>
+        <label>Gearbox whine (Launch &amp; drive) <output></output><input data-param="whine" type="range" min="0" max="1" step="0.01" value="0.1"></label>
+        <label>Combustion roughness <output></output><input data-param="roughness" type="range" min="0" max="0.5" step="0.01" value="0.15"></label>
+        <label>Overrun crackle / pops <output></output><input data-param="crackle" type="range" min="0" max="1" step="0.01" value="0.4"></label>
+        <label>Stereo width (bank A ⟷ B) <output></output><input data-param="width" type="range" min="0" max="1" step="0.01" value="0.35"></label>
+        <label>Room reverb <output></output><input data-param="room" type="range" min="0" max="1" step="0.01" value="0.3"></label>
+        <label>Volume <output></output><input data-param="volume" type="range" min="0" max="1" step="0.01" value="0.6"></label>
+      </div>
+    </section>
+
+    <section class="panel info">
+      <h2 id="engineName"></h2>
+      <p id="engineNote" class="note"></p>
+      <dl class="stats">
+        <dt>Firing order</dt><dd id="statOrder"></dd>
+        <dt>Intervals</dt><dd id="statIntervals"></dd>
+        <dt>Bank pulses</dt><dd id="statBanks"></dd>
+        <dt>Current RPM</dt><dd id="statRpm"></dd>
+        <dt>Firing frequency</dt><dd id="statFreq"></dd>
+      </dl>
+
+      <div class="tach" title="Tachometer (live engine RPM)"><div id="tachFill"></div><div id="tachRedline"></div></div>
+
+      <h3>Crank cycle (720° = 2 revolutions). Cursor = real crank angle at 1/50 speed; flash brightness = combustion load</h3>
+      <canvas id="timeline" width="900" height="200"></canvas>
+
+      <h3>Output waveform <small><span class="swatch a"></span>left / bank A <span class="swatch b"></span>right / bank B</small></h3>
+      <canvas id="scope" width="900" height="200"></canvas>
+    </section>
+  </main>
+
+  <!-- Plain scripts (not modules) so the page works straight from file:// -->
+  <script src="engines.js"></script>
+  <script src="dsp.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

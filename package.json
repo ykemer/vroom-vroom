@@ -1,0 +1,10 @@
+{
+  "name": "exhaust-synth",
+  "version": "1.0.0",
+  "description": "Browser engine exhaust sound simulator driven by real crank firing angles",
+  "private": true,
+  "scripts": {
+    "test": "node test/render.js",
+    "serve": "npx --yes http-server -c-1 -p 8080 ."
+  }
+}
